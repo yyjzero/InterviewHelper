@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "crypto-js": "^4.2.0",
     "lucide-react": "^0.344.0",
+    "pdfjs-dist": "^4.2.67",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

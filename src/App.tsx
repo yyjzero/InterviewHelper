@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { Upload, FileText, Briefcase, Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// 配置 PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/InterviewHelper/pdf.worker.min.mjs';
 
 function App() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState('');
+  const [jobDescImage, setJobDescImage] = useState<File | null>(null);
   const [showQuestions, setShowQuestions] = useState(false);
   const [questions, setQuestions] = useState<Array<{question: string, answer: string}>>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,25 +39,204 @@ function App() {
       // 读取简历内容
       try {
         let content = '';
-        if (file.type === 'text/plain') {
+        if (file.type === 'application/pdf') {
+          // 对于 PDF 文件，先转换为图片再 OCR
+          const imageDataUrl = await pdfToImage(file);
+          // 将 data URL 转换为 File 对象，以便 compressImage 处理
+          const imageFile = await fetch(imageDataUrl).then(res => res.blob()).then(blob => new File([blob], "resume.jpg", { type: "image/jpeg" }));
+          content = await extractTextFromImage(imageFile);
+        } else if (file.type.startsWith('image/')) {
+          // 对于图片文件，使用 OCR 提取文字
+          content = await extractTextFromImage(file);
+        } else if (file.type === 'text/plain') {
           // 对于文本文件，直接读取
           content = await file.text();
         } else {
-          // 对于其他文件类型，提示用户手动输入
-          content = '请手动输入简历内容';
+          // 对于其他文件类型，使用 OCR 尝试提取
+          content = await extractTextFromImage(file);
         }
         setResumeContent(content);
       } catch (error) {
         console.error('读取简历内容失败:', error);
-        setResumeContent('简历内容读取失败，请手动输入');
+        setResumeContent('简历内容读取失败，请检查文件格式');
+      }
+    }
+  };
+
+  // OCR 文字提取函数 - 通过后端代理调用腾讯云 OCR
+  const extractTextFromImage = async (file: File): Promise<string> => {
+    try {
+      // 将文件转换为 base64
+      const base64 = await fileToBase64(file);
+      
+      // 检查是否在GitHub Pages环境
+      const isGitHubPages = window.location.hostname === 'yyjzero.github.io';
+      
+      if (isGitHubPages) {
+        // 在GitHub Pages环境下，提示用户手动输入
+        console.log('GitHub Pages环境：OCR服务不可用，请手动输入内容');
+        return 'OCR服务在GitHub Pages环境下不可用，请手动输入内容';
+      }
+      
+      // 通过后端代理调用腾讯云 OCR API
+      const response = await fetch('http://localhost:3001/api/ocr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageBase64: base64.split(',')[1], // 移除 data:image/...;base64, 前缀
+          secretId: import.meta.env.VITE_TENCENT_SECRET_ID,
+          secretKey: import.meta.env.VITE_TENCENT_SECRET_KEY
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`OCR API 请求失败: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('OCR 响应:', data);
+      
+      if (data.success && data.text) {
+        console.log('识别到的文字:', data.text);
+        return data.text;
+      } else {
+        console.log('未识别到文字，响应数据:', data);
+        if (data.error && data.error.includes('AuthFailure')) {
+          return 'OCR 服务权限不足，请检查腾讯云 API 密钥权限配置';
+        }
+        return '未识别到文字内容';
+      }
+    } catch (error) {
+      console.error('OCR 识别失败:', error);
+      // 在GitHub Pages环境下，返回友好提示而不是错误
+      const isGitHubPages = window.location.hostname === 'yyjzero.github.io';
+      if (isGitHubPages) {
+        return 'OCR服务在GitHub Pages环境下不可用，请手动输入内容';
+      }
+      throw new Error('OCR 识别失败，请检查图片质量或网络连接');
+    }
+  };
+
+  // 图片压缩函数
+  const compressImage = (file: File, maxWidth: number = 1200, quality: number = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // 计算压缩后的尺寸
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // 绘制压缩后的图片
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // 转换为 base64
+        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedBase64);
+      };
+      
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // PDF 转图片函数
+  const pdfToImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          const page = await pdf.getPage(1); // 获取第一页
+          
+          const viewport = page.getViewport({ scale: 2.0 }); // 设置缩放比例
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+          
+          const renderContext = {
+            canvasContext: context!,
+            viewport: viewport,
+            canvas: canvas
+          };
+          
+          await page.render(renderContext).promise;
+          const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(imageDataUrl);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // 文件转 base64 函数
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // 如果是 PDF 文件，先转换为图片
+      if (file.type === 'application/pdf') {
+        pdfToImage(file)
+          .then(resolve)
+          .catch(reject);
+      } else if (file.type.startsWith('image/')) {
+        // 如果是图片文件，先压缩
+        compressImage(file)
+          .then(resolve)
+          .catch(reject);
+      } else {
+        // 其他文件类型直接读取
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+      }
+    });
+  };
+
+  const handleJobDescImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setJobDescImage(file);
+      
+      // 使用 OCR 提取岗位描述文字
+      try {
+        let content = '';
+        if (file.type === 'application/pdf') {
+          const imageDataUrl = await pdfToImage(file);
+          const imageFile = await fetch(imageDataUrl).then(res => res.blob()).then(blob => new File([blob], "job_desc.jpg", { type: "image/jpeg" }));
+          content = await extractTextFromImage(imageFile);
+        } else if (file.type.startsWith('image/')) {
+          content = await extractTextFromImage(file);
+        } else {
+          content = await extractTextFromImage(file); // Fallback for other types
+        }
+        setJobDescription(content);
+      } catch (error) {
+        console.error('读取岗位描述失败:', error);
+        alert('岗位描述图片识别失败，请手动输入');
       }
     }
   };
 
   const handleGenerateQuestions = async () => {
     // 检查是否已上传简历和岗位描述
-    if (!resumeFile && !jobDescription.trim()) {
-      alert('请先上传简历或输入岗位描述');
+    if (!resumeFile && !jobDescription.trim() && !jobDescImage) {
+      alert('请先上传简历和岗位描述');
       return;
     }
 
@@ -60,7 +244,7 @@ function App() {
     setError(null);
 
     try {
-      // 构建提示词
+      // 构建提示词 - 先分析简历和岗位描述
       let prompt = `基于以下信息生成10个面试题目：
 
 简历内容：${resumeContent || '未提供简历内容'}
@@ -199,7 +383,7 @@ function App() {
             面试助手
           </h1>
           <p className="text-base text-[#888888] max-w-xl mx-auto">
-            输入简历内容和岗位描述，生成模拟面试题目
+            上传简历和岗位描述，生成模拟面试题目
           </p>
         </div>
 
@@ -209,36 +393,39 @@ function App() {
               <div className="bg-[#07c160]/10 p-2 rounded-md mr-2.5">
                 <FileText className="w-5 h-5 text-[#07c160]" />
               </div>
-              <h2 className="text-lg font-medium text-[#1a1a1a]">简历内容</h2>
+              <h2 className="text-lg font-medium text-[#1a1a1a]">上传简历</h2>
             </div>
-            <div className="space-y-3">
-              <textarea
-                value={resumeContent}
-                onChange={(e) => setResumeContent(e.target.value)}
-                placeholder="请粘贴或输入简历内容..."
-                className="w-full h-32 px-3 py-2.5 border border-[#d9d9d9] rounded-lg focus:outline-none focus:border-[#07c160] resize-none text-sm text-[#1a1a1a] placeholder-[#b2b2b2] bg-[#fafafa]"
+            <div className="border-2 border-dashed border-[#d9d9d9] rounded-lg p-6 text-center hover:border-[#07c160] transition-colors bg-[#fafafa]">
+              <input
+                type="file"
+                id="resume-upload"
+                accept=".pdf,.doc,.docx,image/*"
+                onChange={handleResumeUpload}
+                className="hidden"
               />
-              <div className="border-2 border-dashed border-[#d9d9d9] rounded-lg p-5 text-center hover:border-[#07c160] transition-colors bg-[#fafafa]">
-                <input
-                  type="file"
-                  id="resume-upload"
-                  accept=".txt"
-                  onChange={handleResumeUpload}
-                  className="hidden"
-                />
-                <label htmlFor="resume-upload" className="cursor-pointer">
-                  <Upload className="w-7 h-7 text-[#b2b2b2] mx-auto mb-1.5" />
-                  <p className="text-xs text-[#1a1a1a]">
-                    {resumeFile ? resumeFile.name : '或上传文本文件'}
-                  </p>
-                </label>
-                {resumeFile && (
-                  <div className="mt-2 flex items-center justify-center text-[#07c160]">
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                    <span className="text-xs">上传成功</span>
+              <label htmlFor="resume-upload" className="cursor-pointer">
+                <Upload className="w-9 h-9 text-[#b2b2b2] mx-auto mb-2" />
+                <p className="text-sm text-[#1a1a1a] mb-1">
+                  {resumeFile ? resumeFile.name : '点击上传或拖拽文件'}
+                </p>
+                <p className="text-xs text-[#888888]">
+                  支持 PDF、Word、图片（最大 10MB）
+                </p>
+              </label>
+              {resumeFile && (
+                <div className="mt-3 flex items-center justify-center text-[#07c160]">
+                  <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                  <span className="text-sm">上传成功</span>
+                </div>
+              )}
+              {resumeContent && (
+                <div className="mt-3">
+                  <div className="text-xs text-[#888888] mb-1">识别到的简历内容：</div>
+                  <div className="text-xs text-[#1a1a1a] bg-[#f7f7f7] p-2 rounded border max-h-20 overflow-y-auto">
+                    {resumeContent}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -249,12 +436,35 @@ function App() {
               </div>
               <h2 className="text-lg font-medium text-[#1a1a1a]">岗位描述</h2>
             </div>
-            <textarea
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              placeholder="粘贴岗位描述..."
-              className="w-full h-32 px-3 py-2.5 border border-[#d9d9d9] rounded-lg focus:outline-none focus:border-[#576b95] resize-none text-sm text-[#1a1a1a] placeholder-[#b2b2b2] bg-[#fafafa]"
-            />
+            <div className="space-y-3">
+              <textarea
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
+                placeholder="粘贴岗位描述..."
+                className="w-full h-28 px-3 py-2.5 border border-[#d9d9d9] rounded-lg focus:outline-none focus:border-[#576b95] resize-none text-sm text-[#1a1a1a] placeholder-[#b2b2b2] bg-[#fafafa]"
+              />
+              <div className="border-2 border-dashed border-[#d9d9d9] rounded-lg p-5 text-center hover:border-[#576b95] transition-colors bg-[#fafafa]">
+                <input
+                  type="file"
+                  id="job-desc-upload"
+                  accept="image/*"
+                  onChange={handleJobDescImageUpload}
+                  className="hidden"
+                />
+                <label htmlFor="job-desc-upload" className="cursor-pointer">
+                  <Upload className="w-7 h-7 text-[#b2b2b2] mx-auto mb-1.5" />
+                  <p className="text-xs text-[#1a1a1a]">
+                    {jobDescImage ? jobDescImage.name : '或上传图片'}
+                  </p>
+                </label>
+                {jobDescImage && (
+                  <div className="mt-2 flex items-center justify-center text-[#07c160]">
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                    <span className="text-xs">上传成功</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
