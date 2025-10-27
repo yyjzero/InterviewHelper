@@ -3,7 +3,7 @@ import { Upload, FileText, Briefcase, Sparkles, CheckCircle2, Loader2 } from 'lu
 import * as pdfjsLib from 'pdfjs-dist';
 
 // 配置 PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/InterviewHelper/pdf.worker.min.mjs';
 
 function App() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
@@ -64,6 +64,15 @@ function App() {
       // 将文件转换为 base64
       const base64 = await fileToBase64(file);
       
+      // 检查是否在GitHub Pages环境
+      const isGitHubPages = window.location.hostname === 'yyjzero.github.io';
+      
+      if (isGitHubPages) {
+        // 在GitHub Pages环境下，提示用户手动输入
+        console.log('GitHub Pages环境：OCR服务不可用，请手动输入内容');
+        return 'OCR服务在GitHub Pages环境下不可用，请手动输入内容';
+      }
+      
       // 通过后端代理调用腾讯云 OCR API
       const response = await fetch('http://localhost:3001/api/ocr', {
         method: 'POST',
@@ -96,6 +105,11 @@ function App() {
       }
     } catch (error) {
       console.error('OCR 识别失败:', error);
+      // 在GitHub Pages环境下，返回友好提示而不是错误
+      const isGitHubPages = window.location.hostname === 'yyjzero.github.io';
+      if (isGitHubPages) {
+        return 'OCR服务在GitHub Pages环境下不可用，请手动输入内容';
+      }
       throw new Error('OCR 识别失败，请检查图片质量或网络连接');
     }
   };
