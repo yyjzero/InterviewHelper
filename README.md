@@ -1,4 +1,4 @@
-# 面试助手应用
+# InterviewHelper - 面试助手应用
 
 一个基于 React + TypeScript + Vite 构建的智能面试准备工具，使用 AI 技术生成个性化的面试题目和建议答案。
 
@@ -18,8 +18,8 @@
 
 ### 1. 克隆项目
 ```bash
-git clone <your-repo-url>
-cd project
+git clone https://github.com/yyjzero/InterviewHelper.git
+cd InterviewHelper
 ```
 
 ### 2. 安装依赖
@@ -58,7 +58,7 @@ npm run dev
 ## 📁 项目结构
 
 ```
-project/
+InterviewHelper/
 ├── src/
 │   ├── App.tsx          # 主应用组件
 │   └── main.tsx         # 应用入口
