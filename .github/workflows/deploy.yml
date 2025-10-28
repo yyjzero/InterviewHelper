@@ -25,9 +25,17 @@ jobs:
       
     - name: Build project
       run: npm run build
+
+    # 如果未配置必需机密，则跳过部署并提示
+    - name: Skip deploy (missing secrets)
+      if: ${{ secrets.VERCEL_TOKEN == '' || secrets.ORG_ID == '' || secrets.PROJECT_ID == '' }}
+      run: |
+        echo "::warning::Missing Vercel secrets (VERCEL_TOKEN / ORG_ID / PROJECT_ID). Skipping deploy."
+        echo "Set them in GitHub → Settings → Secrets and variables → Actions."
       
     - name: Deploy to Vercel
       uses: amondnet/vercel-action@v25
+      if: ${{ secrets.VERCEL_TOKEN != '' && secrets.ORG_ID != '' && secrets.PROJECT_ID != '' }}
       with:
         vercel-token: ${{ secrets.VERCEL_TOKEN }}
         vercel-org-id: ${{ secrets.ORG_ID }}
