@@ -9,6 +9,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      ORG_ID: ${{ secrets.ORG_ID }}
+      PROJECT_ID: ${{ secrets.PROJECT_ID }}
     
     steps:
     - name: Checkout code
@@ -28,16 +32,16 @@ jobs:
 
     # 如果未配置必需机密，则跳过部署并提示
     - name: Skip deploy (missing secrets)
-      if: ${{ secrets.VERCEL_TOKEN == '' || secrets.ORG_ID == '' || secrets.PROJECT_ID == '' }}
+      if: ${{ env.VERCEL_TOKEN == '' || env.ORG_ID == '' || env.PROJECT_ID == '' }}
       run: |
         echo "::warning::Missing Vercel secrets (VERCEL_TOKEN / ORG_ID / PROJECT_ID). Skipping deploy."
         echo "Set them in GitHub → Settings → Secrets and variables → Actions."
       
     - name: Deploy to Vercel
       uses: amondnet/vercel-action@v25
-      if: ${{ secrets.VERCEL_TOKEN != '' && secrets.ORG_ID != '' && secrets.PROJECT_ID != '' }}
+      if: ${{ env.VERCEL_TOKEN != '' && env.ORG_ID != '' && env.PROJECT_ID != '' }}
       with:
-        vercel-token: ${{ secrets.VERCEL_TOKEN }}
-        vercel-org-id: ${{ secrets.ORG_ID }}
-        vercel-project-id: ${{ secrets.PROJECT_ID }}
+        vercel-token: ${{ env.VERCEL_TOKEN }}
+        vercel-org-id: ${{ env.ORG_ID }}
+        vercel-project-id: ${{ env.PROJECT_ID }}
         vercel-args: '--prod'
