@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/InterviewHelper/',
+  base: process.env.NODE_ENV === 'production' ? '/InterviewHelper/' : '/',
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
