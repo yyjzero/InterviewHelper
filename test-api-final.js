@@ -1,13 +1,20 @@
 import pkg from 'tencentcloud-sdk-nodejs';
 const { Credential, OcrClient } = pkg;
 
-// 测试 API key
-const secretId = 'AKIDN9nFWffV9C7uY3iFcs1znPsBC6pLfP2U';
-const secretKey = 'PhnhQwHQOAmBOQJ2Zv44sVv8DAxYw9D5';
+// 从环境变量读取密钥（请在后端环境中配置，而非前端）
+const secretId = process.env.TENCENT_SECRET_ID || '';
+const secretKey = process.env.TENCENT_SECRET_KEY || '';
+
+if (!secretId || !secretKey) {
+  console.error('❌ 缺少环境变量: TENCENT_SECRET_ID / TENCENT_SECRET_KEY');
+  console.error('请以环境变量方式提供密钥，例如:');
+  console.error('TENCENT_SECRET_ID=xxx TENCENT_SECRET_KEY=yyy node test-api-final.js');
+  process.exit(1);
+}
 
 console.log('🔍 开始测试腾讯云 OCR API...');
-console.log(`SecretId: ${secretId.substring(0, 8)}...`);
-console.log(`SecretKey: ${secretKey.substring(0, 8)}...`);
+console.log(`SecretId: ${secretId.substring(0, 4)}********`);
+console.log(`SecretKey: ${secretKey.substring(0, 4)}********`);
 
 async function testApiKey() {
   try {
