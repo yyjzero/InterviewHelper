@@ -92,6 +92,47 @@ npm run build
 npm run preview
 ```
 
+## 🚀 Vercel 自动部署
+
+### 方法一：Vercel CLI（推荐）
+1. 安装 Vercel CLI：
+   ```bash
+   npm i -g vercel
+   ```
+
+2. 在项目根目录运行：
+   ```bash
+   vercel
+   ```
+
+3. 按照提示完成配置，选择：
+   - 项目根目录：`./`
+   - 构建命令：`npm run build`
+   - 输出目录：`dist`
+
+4. 每次推送代码到 main 分支会自动部署
+
+### 方法二：GitHub Actions（已配置）
+1. 在 Vercel 控制台获取以下信息：
+   - Vercel Token（Settings → Tokens）
+   - Organization ID（Settings → General）
+   - Project ID（项目设置 → General）
+
+2. 在 GitHub 仓库设置中添加 Secrets：
+   - `VERCEL_TOKEN`：你的 Vercel Token
+   - `ORG_ID`：你的 Organization ID
+   - `PROJECT_ID`：你的 Project ID
+
+3. 推送代码到 main 分支即可自动部署
+
+### 环境变量配置
+在 Vercel 控制台的项目设置中添加环境变量：
+- `VITE_OPENROUTER_API_KEY`：OpenRouter API 密钥
+- `TENCENT_SECRET_ID`：腾讯云 SecretId
+- `TENCENT_SECRET_KEY`：腾讯云 SecretKey
+
+**注意**：Vercel 环境变量不需要 `VITE_` 前缀，直接使用变量名即可。
+
 ## 📄 许可证
 
 MIT License
