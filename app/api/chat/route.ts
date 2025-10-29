@@ -17,8 +17,9 @@ export async function POST(request: NextRequest) {
 
     // 计算 Referer，OpenRouter 需要匹配在集成设置中允许的域名
     const reqOrigin = request.headers.get('origin')
+    const configuredSite = process.env.OPENROUTER_SITE_URL
     const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined
-    const referer = reqOrigin || vercelUrl || 'http://localhost:3000'
+    const referer = configuredSite || reqOrigin || vercelUrl || 'http://localhost:3000'
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',

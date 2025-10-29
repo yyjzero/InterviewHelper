@@ -168,9 +168,21 @@ export default function Home() {
       console.log('响应头:', Object.fromEntries(response.headers.entries()))
       
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error('API 错误响应:', errorText)
-        throw new Error(`API 请求失败: ${response.status} - ${errorText}`)
+        const contentType = response.headers.get('content-type') || ''
+        let bodyText = await response.text()
+        try {
+          if (contentType.includes('application/json')) {
+            const json = JSON.parse(bodyText)
+            const hint = json.hint ? `\n提示：${json.hint}` : ''
+            bodyText = json.detail ? json.detail : bodyText
+            console.error('API 错误响应:', JSON.stringify(json))
+            throw new Error(`API 请求失败: ${response.status} - ${bodyText}${hint}`)
+          }
+        } catch (_) {
+          // 保底：按文本返回
+        }
+        console.error('API 错误响应:', bodyText)
+        throw new Error(`API 请求失败: ${response.status} - ${bodyText}`)
       }
 
       const data = await response.json()
