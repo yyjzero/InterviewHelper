@@ -1,0 +1,18 @@
+name: Status Check
+
+on:
+  workflow_run:
+    workflows: ["Deploy to Vercel"]
+    types: [completed]
+
+jobs:
+  check-deployment:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+    - name: Check deployment status
+      run: |
+        echo "✅ Deployment completed successfully!"
+        echo "🚀 Your application should be live on Vercel"
+        echo "📝 Check the Vercel dashboard for deployment details"

@@ -2,7 +2,7 @@ name: Deploy to Vercel
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
 
@@ -27,6 +27,12 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
+    - name: Type check
+      run: npm run typecheck
+      
+    - name: Lint check
+      run: npm run lint
+      
     - name: Build project
       run: npm run build
 
@@ -36,6 +42,10 @@ jobs:
       run: |
         echo "::warning::Missing Vercel secrets (VERCEL_TOKEN / ORG_ID / PROJECT_ID). Skipping deploy."
         echo "Set them in GitHub → Settings → Secrets and variables → Actions."
+        echo "Required secrets:"
+        echo "- VERCEL_TOKEN: Your Vercel API token"
+        echo "- ORG_ID: Your Vercel organization ID"
+        echo "- PROJECT_ID: Your Vercel project ID"
       
     - name: Deploy to Vercel
       uses: amondnet/vercel-action@v25
@@ -45,3 +55,4 @@ jobs:
         vercel-org-id: ${{ env.ORG_ID }}
         vercel-project-id: ${{ env.PROJECT_ID }}
         vercel-args: '--prod'
+        working-directory: ./

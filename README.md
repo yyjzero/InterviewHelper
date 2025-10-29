@@ -137,6 +137,33 @@ npm run preview
 
 MIT License
 
+## 🔄 自动部署流程
+
+当您推送代码到 `main` 或 `develop` 分支时，GitHub Actions 会自动：
+
+1. ✅ **代码检查**：TypeScript 类型检查
+2. ✅ **代码质量**：ESLint 代码规范检查  
+3. ✅ **项目构建**：Next.js 生产环境构建
+4. ✅ **自动部署**：推送到 Vercel 生产环境
+5. ✅ **状态通知**：部署完成后发送通知
+
+### 📋 部署要求
+
+- **Node.js**: 18.x
+- **包管理器**: npm
+- **构建命令**: `npm run build`
+- **输出目录**: `.next`
+- **API 超时**: 30秒
+
+### 🛠️ 故障排除
+
+如果部署失败，请检查：
+
+1. **GitHub Secrets 配置**：确保所有必需的 secrets 都已正确设置
+2. **环境变量**：确保 Vercel 中的环境变量配置正确
+3. **构建日志**：查看 GitHub Actions 的详细日志
+4. **Vercel 日志**：查看 Vercel Dashboard 中的部署日志
+
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
