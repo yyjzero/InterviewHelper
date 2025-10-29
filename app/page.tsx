@@ -24,8 +24,9 @@ export default function Home() {
         const pdfjsLib = await import('pdfjs-dist')
         pdfjs = pdfjsLib
         
-        // 设置 worker
-        pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`
+        // 设置 worker - 使用CDN路径以确保在Vercel上正常工作
+        // 使用固定版本号确保稳定性
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs`
         
         // 等待一小段时间确保worker完全初始化
         await new Promise(resolve => setTimeout(resolve, 100))
