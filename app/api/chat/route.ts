@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': referer,
+        // 同时设置 Referer/Origin，提升通过率
+        'Referer': referer,
+        'Origin': referer,
         'X-Title': 'Interview Helper'
       },
       body: JSON.stringify({
@@ -41,7 +44,15 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       const errorText = await response.text()
       console.error('OpenRouter API 错误:', errorText)
-      return NextResponse.json({ error: `API 请求失败: ${response.status}` }, { status: response.status })
+      // 返回更详细的错误信息，帮助前端定位（不包含敏感数据）
+      const payload = {
+        error: `API 请求失败: ${response.status}`,
+        detail: errorText,
+        hint: response.status === 401
+          ? '请检查 OPENROUTER_API_KEY 是否配置于服务端环境变量，以及 OpenRouter Integrations 中 Allowed Sites 是否包含当前域名'
+          : undefined,
+      }
+      return new NextResponse(JSON.stringify(payload), { status: response.status, headers: { 'Content-Type': 'application/json' } })
     }
 
     const data = await response.json()
